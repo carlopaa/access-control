@@ -1,6 +1,6 @@
 <?php
 
-namespace Aapolrac\Rbac\Support;
+namespace Aapolrac\AccessControl\Support;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +40,7 @@ class RoleGroupSync
     public static function syncDefaultsForRoles(Model $user, Model|int $organization, array $roleKeys): void
     {
         $orgId = $organization instanceof Model ? (int) $organization->getKey() : (int) $organization;
-        $map = (array) config('rbac.groups', []);
+        $map = (array) config('access_control.groups', []);
 
         $managedGroupKeys = collect($map)->flatten()->unique()->values();
         $desiredGroupKeys = collect($roleKeys)
@@ -99,7 +99,7 @@ class RoleGroupSync
 
     public static function roleToDefaultGroupsMap(): array
     {
-        return (array) config('rbac.groups', []);
+        return (array) config('access_control.groups', []);
     }
 
     protected static function resolveGroupIds(array $groups): array
@@ -117,16 +117,16 @@ class RoleGroupSync
 
     protected static function groupModel(): string
     {
-        return (string) config('rbac.models.group');
+        return (string) config('access_control.models.group');
     }
 
     protected static function groupTable(): string
     {
-        return (string) config('rbac.tables.groups', 'groups');
+        return (string) config('access_control.tables.groups', 'groups');
     }
 
     protected static function groupUserTable(): string
     {
-        return (string) config('rbac.tables.group_user', 'group_user');
+        return (string) config('access_control.tables.group_user', 'group_user');
     }
 }

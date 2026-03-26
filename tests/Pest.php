@@ -1,5 +1,5 @@
 <?php
 
-use Aapolrac\Rbac\Tests\TestCase;
+use Aapolrac\AccessControl\Tests\TestCase;
 
 uses(TestCase::class)->in(__DIR__);

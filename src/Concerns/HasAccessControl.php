@@ -1,21 +1,21 @@
 <?php
 
-namespace Aapolrac\Rbac\Concerns;
+namespace Aapolrac\AccessControl\Concerns;
 
-use Aapolrac\Rbac\Contracts\TenantResolver;
+use Aapolrac\AccessControl\Contracts\TenantResolver;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Context;
 
-trait HasRbac
+trait HasAccessControl
 {
     public function getAllPermissions(): Collection
     {
         $authenticatedUserId = Auth::id();
-        $cacheEnabled = (bool) config('rbac.context_cache.enabled', true);
-        $cacheKey = (string) config('rbac.context_cache.key', 'permissions');
+        $cacheEnabled = (bool) config('access_control.context_cache.enabled', true);
+        $cacheKey = (string) config('access_control.context_cache.key', 'permissions');
 
         if ($cacheEnabled && $authenticatedUserId === $this->id && Context::hasHidden($cacheKey)) {
             return collect(Context::getHidden($cacheKey));
@@ -259,8 +259,8 @@ trait HasRbac
     protected function forgetPermissionContextCache(): void
     {
         $authenticatedUserId = Auth::id();
-        $cacheEnabled = (bool) config('rbac.context_cache.enabled', true);
-        $cacheKey = (string) config('rbac.context_cache.key', 'permissions');
+        $cacheEnabled = (bool) config('access_control.context_cache.enabled', true);
+        $cacheKey = (string) config('access_control.context_cache.key', 'permissions');
 
         if ($cacheEnabled && $authenticatedUserId === $this->id) {
             Context::forgetHidden($cacheKey);

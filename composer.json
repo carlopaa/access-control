@@ -1,12 +1,14 @@
 {
-    "name": "carlopaa/rbac",
-    "description": "Group roles and permissions",
+    "name": "carlopaa/access-control",
+    "description": "Tenant-aware access control with roles, groups, and permissions",
     "keywords": [
         "carlopaa",
         "laravel",
+        "access-control",
+        "acl",
         "rbac"
     ],
-    "homepage": "https://github.com/carlopaa/rbac",
+    "homepage": "https://github.com/carlopaa/access-control",
     "license": "MIT",
     "authors": [
         {
@@ -35,13 +37,13 @@
     },
     "autoload": {
         "psr-4": {
-            "Aapolrac\\Rbac\\": "src/",
-            "Aapolrac\\Rbac\\Database\\Factories\\": "database/factories/"
+            "Aapolrac\\AccessControl\\": "src/",
+            "Aapolrac\\AccessControl\\Database\\Factories\\": "database/factories/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Aapolrac\\Rbac\\Tests\\": "tests/",
+            "Aapolrac\\AccessControl\\Tests\\": "tests/",
             "Workbench\\App\\": "workbench/app/"
         }
     },
@@ -63,10 +65,10 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Aapolrac\\Rbac\\RbacServiceProvider"
+                "Aapolrac\\AccessControl\\AccessControlServiceProvider"
             ],
             "aliases": {
-                "Rbac": "Aapolrac\\Rbac\\Facades\\Rbac"
+                "AccessControl": "Aapolrac\\AccessControl\\Facades\\AccessControl"
             }
         }
     },

@@ -1,23 +1,23 @@
 <?php
 
-namespace Aapolrac\Rbac\Commands;
+namespace Aapolrac\AccessControl\Commands;
 
 use Illuminate\Console\Command;
 
 class SyncPermissionsCommand extends Command
 {
-    public $signature = 'rbac:sync
+    public $signature = 'access-control:sync
                         {--only-missing : Skip permissions that already exist in the database}';
 
-    public $description = 'Seed permissions from the enum classes configured in config/rbac.php';
+    public $description = 'Seed permissions from the enum classes configured in config/access_control.php';
 
     public function handle(): int
     {
-        $permissionModel = config('rbac.models.permission');
-        $enumClasses = (array) config('rbac.permissions.enum_classes', []);
+        $permissionModel = config('access_control.models.permission');
+        $enumClasses = (array) config('access_control.permissions.enum_classes', []);
 
         if (empty($enumClasses)) {
-            $this->warn('No enum classes found in config rbac.permissions.enum_classes — nothing to sync.');
+            $this->warn('No enum classes found in config access_control.permissions.enum_classes - nothing to sync.');
 
             return self::SUCCESS;
         }

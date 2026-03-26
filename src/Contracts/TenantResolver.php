@@ -1,6 +1,6 @@
 <?php
 
-namespace Aapolrac\Rbac\Contracts;
+namespace Aapolrac\AccessControl\Contracts;
 
 use Illuminate\Database\Eloquent\Model;
 

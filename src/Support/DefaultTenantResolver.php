@@ -1,8 +1,8 @@
 <?php
 
-namespace Aapolrac\Rbac\Support;
+namespace Aapolrac\AccessControl\Support;
 
-use Aapolrac\Rbac\Contracts\TenantResolver;
+use Aapolrac\AccessControl\Contracts\TenantResolver;
 use Illuminate\Database\Eloquent\Model;
 
 class DefaultTenantResolver implements TenantResolver

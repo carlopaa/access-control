@@ -1,59 +1,89 @@
-# Group roles and permissions
+# Access control for Laravel
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/carlopaa/rbac.svg?style=flat-square)](https://packagist.org/packages/carlopaa/rbac)
-[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/carlopaa/rbac/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/carlopaa/rbac/actions?query=workflow%3Arun-tests+branch%3Amain)
-[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/carlopaa/rbac/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/carlopaa/rbac/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
-[![Total Downloads](https://img.shields.io/packagist/dt/carlopaa/rbac.svg?style=flat-square)](https://packagist.org/packages/carlopaa/rbac)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/carlopaa/access-control.svg?style=flat-square)](https://packagist.org/packages/carlopaa/access-control)
+[![Total Downloads](https://img.shields.io/packagist/dt/carlopaa/access-control.svg?style=flat-square)](https://packagist.org/packages/carlopaa/access-control)
 
-This is where your description should go. Limit it to a paragraph or two. Consider adding a small example.
+`carlopaa/access-control` is a Laravel package for tenant-aware access control using roles, groups, and permissions.
 
-## Support us
+It is intentionally broader than strict RBAC:
 
-[<img src="https://github-ads.s3.eu-central-1.amazonaws.com/rbac.jpg?t=1" width="419px" />](https://spatie.be/github-ad-click/rbac)
-
-We invest a lot of resources into creating [best in class open source packages](https://spatie.be/open-source). You can support us by [buying one of our paid products](https://spatie.be/open-source/support-us).
-
-We highly appreciate you sending us a postcard from your hometown, mentioning which of our package(s) you are using. You'll find our address on [our contact page](https://spatie.be/about-us). We publish all received postcards on [our virtual postcard wall](https://spatie.be/open-source/postcards).
+- roles can map to default groups
+- groups aggregate permissions
+- users can also receive direct permissions
+- organization-scoped pivots make multi-tenant access checks predictable
+- `:deny` permissions explicitly override allows
 
 ## Installation
 
 You can install the package via composer:
 
 ```bash
-composer require carlopaa/rbac
+composer require carlopaa/access-control
 ```
 
 You can publish and run the migrations with:
 
 ```bash
-php artisan vendor:publish --tag="rbac-migrations"
+php artisan vendor:publish --tag="access-control-migrations"
 php artisan migrate
 ```
 
 You can publish the config file with:
 
 ```bash
-php artisan vendor:publish --tag="rbac-config"
-```
-
-This is the contents of the published config file:
-
-```php
-return [
-];
-```
-
-Optionally, you can publish the views using
-
-```bash
-php artisan vendor:publish --tag="rbac-views"
+php artisan vendor:publish --tag="access-control-config"
 ```
 
 ## Usage
 
 ```php
-$rbac = new Aapolrac\Rbac();
-echo $rbac->echoPhrase('Hello, Aapolrac!');
+use Aapolrac\AccessControl\Concerns\HasAccessControl;
+
+class User extends Authenticatable
+{
+    use HasAccessControl;
+}
+```
+
+Configure your host app in `config/access_control.php`:
+
+```php
+return [
+    'models' => [
+        'role' => App\Models\Role::class,
+        'group' => App\Models\Group::class,
+        'permission' => App\Models\Permission::class,
+    ],
+
+    'permissions' => [
+        'enum_classes' => [
+            App\Enums\MemberPermission::class,
+            App\Enums\CustomerPermission::class,
+        ],
+    ],
+
+    'groups' => [
+        'owner' => ['manage_members', 'manage_customers'],
+    ],
+];
+```
+
+Sync permissions from your enums:
+
+```bash
+php artisan access-control:sync
+```
+
+Example checks:
+
+```php
+$user->hasRole('owner');
+$user->hasPermission('member:view-any');
+$user->assignPermission('customer:view-any');
+
+Route::middleware(['auth', 'access.permission:member:view-any'])->group(function () {
+    // ...
+});
 ```
 
 ## Testing
@@ -62,22 +92,9 @@ echo $rbac->echoPhrase('Hello, Aapolrac!');
 composer test
 ```
 
-## Changelog
-
-Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
-
-## Contributing
-
-Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
-
-## Security Vulnerabilities
-
-Please review [our security policy](../../security/policy) on how to report security vulnerabilities.
-
 ## Credits
 
 - [Carlo Garcia Paa](https://github.com/carlopaa)
-- [All Contributors](../../contributors)
 
 ## License
 

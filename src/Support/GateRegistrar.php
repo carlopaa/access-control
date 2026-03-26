@@ -1,21 +1,11 @@
 <?php
 
-namespace Aapolrac\Rbac\Support;
+namespace Aapolrac\AccessControl\Support;
 
 use Illuminate\Support\Facades\Gate;
 
 class GateRegistrar
 {
-    /**
-     * Register a Gate ability for every string in the given enum class or an explicit list.
-     *
-     * Each registered permission becomes resolvable via:
-     *   Gate::allows('member:view-any')  or  $user->can('member:view-any')
-     *
-     * Usage in a service provider:
-     *   GateRegistrar::registerPermissions(MemberPermission::class);
-     *   GateRegistrar::registerPermissions(['member:view-any', 'member:create']);
-     */
     public static function registerPermissions(string|array $source): void
     {
         $permissions = is_array($source) ? $source : static::extractFromEnum($source);
@@ -37,15 +27,6 @@ class GateRegistrar
         }
     }
 
-    /**
-     * Register a Gate ability for every string-backed enum value in the given class.
-     *
-     * Usage:
-     *   GateRegistrar::registerRoles(UserRole::class);
-     *   GateRegistrar::registerRoles(['owner', 'admin']);
-     *
-     * Registers as:  Gate::allows('role:owner')
-     */
     public static function registerRoles(string|array $source): void
     {
         $roles = is_array($source) ? $source : static::extractFromEnum($source);
@@ -68,9 +49,6 @@ class GateRegistrar
         }
     }
 
-    /**
-     * @return list<string>
-     */
     protected static function extractFromEnum(string $enumClass): array
     {
         if (! enum_exists($enumClass)) {

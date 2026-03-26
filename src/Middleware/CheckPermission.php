@@ -1,6 +1,6 @@
 <?php
 
-namespace Aapolrac\Rbac\Middleware;
+namespace Aapolrac\AccessControl\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;

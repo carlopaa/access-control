@@ -1,8 +1,8 @@
 <?php
 
-namespace Aapolrac\Rbac\Tests;
+namespace Aapolrac\AccessControl\Tests;
 
-use Aapolrac\Rbac\RbacServiceProvider;
+use Aapolrac\AccessControl\AccessControlServiceProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Orchestra\Testbench\TestCase as Orchestra;
 
@@ -13,14 +13,14 @@ class TestCase extends Orchestra
         parent::setUp();
 
         Factory::guessFactoryNamesUsing(
-            fn (string $modelName) => 'Aapolrac\\Rbac\\Database\\Factories\\'.class_basename($modelName).'Factory'
+            fn (string $modelName) => 'Aapolrac\\AccessControl\\Database\\Factories\\'.class_basename($modelName).'Factory'
         );
     }
 
     protected function getPackageProviders($app)
     {
         return [
-            RbacServiceProvider::class,
+            AccessControlServiceProvider::class,
         ];
     }
 
