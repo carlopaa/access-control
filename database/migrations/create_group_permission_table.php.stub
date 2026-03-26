@@ -8,18 +8,18 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(config('rbac.tables.group_permission', 'group_permission'), function (Blueprint $table) {
+        Schema::create(config('access_control.tables.group_permission', 'group_permission'), function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('group_id');
             $table->unsignedBigInteger('permission_id');
             $table->timestamps();
 
-            $table->unique(['group_id', 'permission_id'], 'rbac_group_permission_unique');
+            $table->unique(['group_id', 'permission_id'], 'access_control_group_permission_unique');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists(config('rbac.tables.group_permission', 'group_permission'));
+        Schema::dropIfExists(config('access_control.tables.group_permission', 'group_permission'));
     }
 };

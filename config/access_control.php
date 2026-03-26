@@ -1,8 +1,8 @@
 <?php
 
-use App\Models\Group;
-use App\Models\Permission;
-use App\Models\Role;
+use Aapolrac\AccessControl\Models\Group;
+use Aapolrac\AccessControl\Models\Permission;
+use Aapolrac\AccessControl\Models\Role;
 
 return [
     'models' => [
@@ -27,7 +27,7 @@ return [
 
     /*
      * Register permission Gate abilities automatically at boot from these enum classes.
-     * Example: 'enum_classes' => [MemberPermission::class, CustomerPermission::class]
+     * Example: 'enum_classes' => [\App\Enums\MemberPermission::class, \App\Enums\CustomerPermission::class]
      */
     'permissions' => [
         'enum_classes' => [],

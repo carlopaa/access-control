@@ -8,20 +8,20 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(config('rbac.tables.role_user', 'role_user'), function (Blueprint $table) {
+        Schema::create(config('access_control.tables.role_user', 'role_user'), function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('role_id');
             $table->unsignedBigInteger('organization_id');
             $table->timestamps();
 
-            $table->unique(['user_id', 'role_id', 'organization_id'], 'rbac_role_user_unique');
-            $table->index(['organization_id', 'role_id'], 'rbac_role_user_org_role_index');
+            $table->unique(['user_id', 'role_id', 'organization_id'], 'access_control_role_user_unique');
+            $table->index(['organization_id', 'role_id'], 'access_control_role_user_org_role_index');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists(config('rbac.tables.role_user', 'role_user'));
+        Schema::dropIfExists(config('access_control.tables.role_user', 'role_user'));
     }
 };

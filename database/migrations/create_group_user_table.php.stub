@@ -8,20 +8,20 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(config('rbac.tables.group_user', 'group_user'), function (Blueprint $table) {
+        Schema::create(config('access_control.tables.group_user', 'group_user'), function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('group_id');
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('organization_id')->nullable();
             $table->timestamps();
 
-            $table->unique(['group_id', 'user_id', 'organization_id'], 'rbac_group_user_unique');
-            $table->index(['organization_id', 'group_id'], 'rbac_group_user_org_group_index');
+            $table->unique(['group_id', 'user_id', 'organization_id'], 'access_control_group_user_unique');
+            $table->index(['organization_id', 'group_id'], 'access_control_group_user_org_group_index');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists(config('rbac.tables.group_user', 'group_user'));
+        Schema::dropIfExists(config('access_control.tables.group_user', 'group_user'));
     }
 };
