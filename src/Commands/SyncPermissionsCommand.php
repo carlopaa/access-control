@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Aapolrac\AccessControl\Commands;
 
 use Illuminate\Console\Command;
@@ -33,6 +35,10 @@ class SyncPermissionsCommand extends Command
             }
 
             foreach ($enumClass::cases() as $case) {
+                if (! $case instanceof \BackedEnum) {
+                    continue;
+                }
+
                 $name = strtolower((string) $case->value);
                 $description = ucfirst(strtolower(str_replace(['_', ':'], ' ', $name)));
 

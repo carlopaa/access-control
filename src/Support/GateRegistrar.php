@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Aapolrac\AccessControl\Support;
 
 use Illuminate\Support\Facades\Gate;
@@ -55,9 +57,9 @@ class GateRegistrar
             return [];
         }
 
-        return array_map(
-            static fn ($case) => (string) $case->value,
+        return array_values(array_filter(array_map(
+            static fn (\UnitEnum $case) => $case instanceof \BackedEnum ? $case->value : null,
             $enumClass::cases()
-        );
+        )));
     }
 }

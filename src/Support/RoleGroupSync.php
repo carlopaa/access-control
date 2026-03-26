@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Aapolrac\AccessControl\Support;
 
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +19,7 @@ class RoleGroupSync
             return;
         }
 
+        /** @phpstan-ignore method.notFound */
         $alreadyAttached = $user->groups()
             ->wherePivot('organization_id', $orgId)
             ->pluck(static::groupTable().'.id')
@@ -34,6 +37,7 @@ class RoleGroupSync
             $payload[$groupId] = ['organization_id' => $orgId];
         }
 
+        /** @phpstan-ignore method.notFound */
         $user->groups()->attach($payload);
     }
 
@@ -78,6 +82,7 @@ class RoleGroupSync
                 $attach[$groupId] = ['organization_id' => $orgId];
             }
 
+            /** @phpstan-ignore method.notFound */
             $user->groups()->attach($attach);
         }
 

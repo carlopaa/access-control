@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Aapolrac\AccessControl;
 
 use Aapolrac\AccessControl\Commands\AccessControlCommand;
@@ -69,7 +71,10 @@ class AccessControlServiceProvider extends PackageServiceProvider
             GateRegistrar::registerPermissions(
                 array_merge(...array_map(
                     static fn (string $class) => enum_exists($class)
-                        ? array_map(static fn ($case) => $case->value, $class::cases())
+                        ? array_values(array_filter(array_map(
+                            static fn (\UnitEnum $case) => $case instanceof \BackedEnum ? $case->value : null,
+                            $class::cases()
+                        )))
                         : [],
                     $enumClasses
                 ))

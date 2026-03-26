@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Aapolrac\AccessControl\Concerns;
 
 use Aapolrac\AccessControl\Contracts\TenantResolver;
