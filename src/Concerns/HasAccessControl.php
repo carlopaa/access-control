@@ -7,12 +7,40 @@ namespace Aapolrac\AccessControl\Concerns;
 use Aapolrac\AccessControl\Contracts\TenantResolver;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Context;
 
 trait HasAccessControl
 {
+    public function initializeHasAccessControl(): void
+    {
+        if (method_exists($this, 'mergeCasts')) {
+            $this->mergeCasts(['permissions' => 'array']);
+        }
+    }
+
+    public function roles(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            (string) config('access_control.models.role'),
+            (string) config('access_control.tables.role_user', 'role_user'),
+            'user_id',
+            'role_id'
+        )->withPivot('organization_id')->withTimestamps();
+    }
+
+    public function groups(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            (string) config('access_control.models.group'),
+            (string) config('access_control.tables.group_user', 'group_user'),
+            'user_id',
+            'group_id'
+        )->withPivot('organization_id')->withTimestamps();
+    }
+
     public function getAllPermissions(): Collection
     {
         $authenticatedUserId = Auth::id();
@@ -153,8 +181,10 @@ trait HasAccessControl
 
     public function hasRoleInOrg(BackedEnum|string $role, int $organizationId): bool
     {
+        $roleTable = (string) config('access_control.tables.roles', 'roles');
+
         return $this->roles()
-            ->where('roles.key', $this->normalizeEnumOrString($role))
+            ->where($roleTable.'.key', $this->normalizeEnumOrString($role))
             ->wherePivot('organization_id', $organizationId)
             ->exists();
     }
@@ -162,9 +192,10 @@ trait HasAccessControl
     public function hasAnyRoleInOrg(array $roles, int $organizationId): bool
     {
         $roleValues = array_map(fn ($role) => $this->normalizeEnumOrString($role), $roles);
+        $roleTable = (string) config('access_control.tables.roles', 'roles');
 
         return $this->roles()
-            ->whereIn('roles.key', $roleValues)
+            ->whereIn($roleTable.'.key', $roleValues)
             ->wherePivot('organization_id', $organizationId)
             ->exists();
     }
@@ -172,18 +203,20 @@ trait HasAccessControl
     public function scopeWithRole(Builder $query, BackedEnum|string $role): Builder
     {
         $roleValue = $this->normalizeEnumOrString($role);
+        $roleTable = (string) config('access_control.tables.roles', 'roles');
 
-        return $query->whereHas('roles', function ($builder) use ($roleValue) {
-            $builder->where('roles.key', $roleValue);
+        return $query->whereHas('roles', function ($builder) use ($roleTable, $roleValue) {
+            $builder->where($roleTable.'.key', $roleValue);
         });
     }
 
     public function scopeWithAnyRoles(Builder $query, array $roles): Builder
     {
         $roleValues = array_map(fn ($role) => $this->normalizeEnumOrString($role), $roles);
+        $roleTable = (string) config('access_control.tables.roles', 'roles');
 
-        return $query->whereHas('roles', function ($builder) use ($roleValues) {
-            $builder->whereIn('roles.key', $roleValues);
+        return $query->whereHas('roles', function ($builder) use ($roleTable, $roleValues) {
+            $builder->whereIn($roleTable.'.key', $roleValues);
         });
     }
 
@@ -191,17 +224,19 @@ trait HasAccessControl
     {
         $roleValue = $this->normalizeEnumOrString($role);
         $organizationId = $this->resolveOrganizationId($organization);
+        $roleTable = (string) config('access_control.tables.roles', 'roles');
+        $roleUserTable = (string) config('access_control.tables.role_user', 'role_user');
 
         if ($organizationId === null) {
-            return $query->whereHas('roles', function ($builder) use ($roleValue) {
-                $builder->where('roles.key', $roleValue);
+            return $query->whereHas('roles', function ($builder) use ($roleTable, $roleValue) {
+                $builder->where($roleTable.'.key', $roleValue);
             });
         }
 
-        return $query->whereHas('roles', function ($builder) use ($roleValue, $organizationId) {
+        return $query->whereHas('roles', function ($builder) use ($roleTable, $roleUserTable, $roleValue, $organizationId) {
             $builder
-                ->where('roles.key', $roleValue)
-                ->where('role_user.organization_id', $organizationId);
+                ->where($roleTable.'.key', $roleValue)
+                ->where($roleUserTable.'.organization_id', $organizationId);
         });
     }
 
@@ -209,17 +244,19 @@ trait HasAccessControl
     {
         $roleValues = array_map(fn ($role) => $this->normalizeEnumOrString($role), $roles);
         $organizationId = $this->resolveOrganizationId($organization);
+        $roleTable = (string) config('access_control.tables.roles', 'roles');
+        $roleUserTable = (string) config('access_control.tables.role_user', 'role_user');
 
         if ($organizationId === null) {
-            return $query->whereHas('roles', function ($builder) use ($roleValues) {
-                $builder->whereIn('roles.key', $roleValues);
+            return $query->whereHas('roles', function ($builder) use ($roleTable, $roleValues) {
+                $builder->whereIn($roleTable.'.key', $roleValues);
             });
         }
 
-        return $query->whereHas('roles', function ($builder) use ($roleValues, $organizationId) {
+        return $query->whereHas('roles', function ($builder) use ($roleTable, $roleUserTable, $roleValues, $organizationId) {
             $builder
-                ->whereIn('roles.key', $roleValues)
-                ->where('role_user.organization_id', $organizationId);
+                ->whereIn($roleTable.'.key', $roleValues)
+                ->where($roleUserTable.'.organization_id', $organizationId);
         });
     }
 

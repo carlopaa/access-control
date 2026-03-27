@@ -69,6 +69,8 @@ Schema::table('users', function (Blueprint $table) {
 });
 ```
 
+`HasAccessControl` automatically casts `permissions` to an array, so you do not need to add a separate cast on the user model.
+
 3. Configure `config/access_control.php` (models, enum classes, groups).
 
 4. Seed permissions from your enums:
@@ -86,7 +88,8 @@ $user->hasPermission('member:view-any');
 
 ## Required model setup
 
-The trait expects `roles()` and `groups()` relations on the user model.
+The trait provides default `roles()` and `groups()` relations on the user model.
+Only add your own methods if you want to customize those relationships.
 
 ```php
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;

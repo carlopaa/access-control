@@ -35,6 +35,7 @@ class AccessControlServiceProvider extends PackageServiceProvider
 
     public function packageRegistered(): void
     {
+        $this->app->singleton(AccessControl::class, static fn (): AccessControl => new AccessControl);
         $this->app->singleton(TenantResolver::class, DefaultTenantResolver::class);
     }
 
