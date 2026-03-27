@@ -127,9 +127,9 @@ public function permissions(): BelongsToMany
 ```php
 return [
     'models' => [
-        'role' => App\Models\Role::class,
-        'group' => App\Models\Group::class,
-        'permission' => App\Models\Permission::class,
+        'role' => Aapolrac\AccessControl\Models\Role::class,
+        'group' => Aapolrac\AccessControl\Models\Group::class,
+        'permission' => Aapolrac\AccessControl\Models\Permission::class,
     ],
 
     'tables' => [
@@ -168,6 +168,16 @@ By default, the package ships with these models:
 - `Aapolrac\AccessControl\Models\Permission`
 
 In your app, you can override them in `models` with your own Eloquent classes.
+
+Example override:
+
+```php
+'models' => [
+    'role' => App\Models\Role::class,
+    'group' => App\Models\Group::class,
+    'permission' => App\Models\Permission::class,
+],
+```
 
 ## Commands
 
@@ -239,8 +249,25 @@ RoleGroupSync::syncDefaultsForRoles($user, $organizationId, ['owner', 'manager']
 You can also attach explicit groups by key or id:
 
 ```php
-RoleGroupSync::attach($user, $organizationId, ['members.manage', 5]);
 RoleGroupSync::attach($user, $organizationId, ['team-management', 5]);
+```
+
+## Troubleshooting
+
+### `vendor:publish --tag="access-control-config"` not available
+
+If the tag is not found, run:
+
+```bash
+composer update carlopaa/access-control -W
+php artisan package:discover --ansi
+php artisan vendor:publish --provider="Aapolrac\\AccessControl\\AccessControlServiceProvider" --tag="access-control-config"
+```
+
+If `config/access_control.php` already exists, Laravel will skip it. Use force when you want to overwrite:
+
+```bash
+php artisan vendor:publish --tag="access-control-config" --force
 ```
 
 ## Middleware
