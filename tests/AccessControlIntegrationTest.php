@@ -17,6 +17,7 @@ use Aapolrac\AccessControl\Tests\Fixtures\OrganizationResolver as TestOrganizati
 use Aapolrac\AccessControl\Tests\Fixtures\TenantResolver as TestTenantResolver;
 use Aapolrac\AccessControl\Tests\Fixtures\User;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Route;
 
@@ -134,6 +135,75 @@ it('syncs permissions from configured enums and integrates with gates', function
         ->and($user->can(MemberPermission::Update->value))->toBeFalse()
         ->and(Permission::query()->pluck('name')->all())
             ->toEqualCanonicalizing([MemberPermission::ViewAny->value, MemberPermission::Update->value]);
+});
+
+it('generates a permissions enum for a resource', function (): void {
+    $directory = base_path('build/generated-enums');
+    $filePath = $directory.'/CustomerPermission.php';
+
+    File::deleteDirectory($directory);
+
+    $this->artisan('access-control:make-enum', [
+        'name' => 'CustomerPermission',
+        '--resource' => 'customer',
+        '--path' => $directory,
+    ])
+        ->expectsOutputToContain('Permission enum created')
+        ->assertSuccessful();
+
+    expect(File::exists($filePath))->toBeTrue();
+
+    $contents = File::get($filePath);
+
+    expect($contents)->toContain("enum CustomerPermission: string")
+        ->and($contents)->toContain("case ALLOW_VIEW = 'customer:view';")
+        ->and($contents)->toContain("case ALLOW_DELETE_ANY = 'customer:delete-any';")
+        ->and($contents)->not->toContain('DENY_VIEW');
+});
+
+it('can include deny cases when generating a permissions enum', function (): void {
+    $directory = base_path('build/generated-enums-with-deny');
+    $filePath = $directory.'/CustomerPermission.php';
+
+    File::deleteDirectory($directory);
+
+    $this->artisan('access-control:make-enum', [
+        'name' => 'CustomerPermission',
+        '--resource' => 'customer',
+        '--path' => $directory,
+        '--deny' => true,
+    ])->assertSuccessful();
+
+    $contents = File::get($filePath);
+
+    expect($contents)->toContain("case DENY_VIEW = 'customer:view:deny';")
+        ->and($contents)->toContain("case DENY_DELETE_ANY = 'customer:delete-any:deny';");
+});
+
+it('does not overwrite an existing permissions enum unless forced', function (): void {
+    $directory = base_path('build/generated-enums-protected');
+    $filePath = $directory.'/CustomerPermission.php';
+
+    File::deleteDirectory($directory);
+    File::ensureDirectoryExists($directory);
+    File::put($filePath, 'original');
+
+    $this->artisan('access-control:make-enum', [
+        'name' => 'CustomerPermission',
+        '--resource' => 'customer',
+        '--path' => $directory,
+    ])->assertFailed();
+
+    expect(File::get($filePath))->toBe('original');
+
+    $this->artisan('access-control:make-enum', [
+        'name' => 'CustomerPermission',
+        '--resource' => 'customer',
+        '--path' => $directory,
+        '--force' => true,
+    ])->assertSuccessful();
+
+    expect(File::get($filePath))->toContain("case ALLOW_VIEW = 'customer:view';");
 });
 
 it('registers middleware aliases that enforce package permissions and roles', function (): void {

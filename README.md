@@ -197,6 +197,19 @@ php artisan access-control:sync
 php artisan access-control:sync --only-missing
 ```
 
+Generate a permission enum for a resource:
+
+```bash
+php artisan access-control:make-enum CustomerPermission --resource=customer
+php artisan access-control:make-enum CustomerPermission --resource=customer --deny
+```
+
+By default the command writes to `app/Enums`, appends `Permission` if needed, and generates:
+
+- allow cases for `view`, `create`, `update`, `delete`
+- allow cases for `view-any`, `create-any`, `update-any`, `delete-any`
+- optional deny cases when `--deny` is provided
+
 ## Using permissions and roles
 
 ### Permission checks
