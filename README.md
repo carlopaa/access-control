@@ -82,8 +82,8 @@ php artisan access-control:sync
 5. Use checks in code:
 
 ```php
+$user->hasPermission(MemberPermission::ALLOW_VIEW_ANY);
 $user->assignRole('owner', $scopeId);
-$user->hasPermission('member:view-any');
 ```
 
 ## Required model setup
@@ -226,8 +226,11 @@ By default the command writes to `app/Enums`, appends `Permission` if needed, an
 ### Permission checks
 
 ```php
-$user->hasPermission('member:view-any');
-$user->hasAnyPermission(['member:view-any', 'member:update']);
+$user->hasPermission(MemberPermission::ALLOW_VIEW_ANY);
+$user->hasAnyPermission([
+    MemberPermission::ALLOW_VIEW_ANY,
+    MemberPermission::ALLOW_UPDATE,
+]);
 ```
 
 ### Deny override
@@ -237,10 +240,10 @@ If a user has `member:view-any:deny`, then `hasPermission('member:view-any')` re
 ### Direct permission API
 
 ```php
-$user->assignPermission('customer:view-any');
-$user->assignPermissions(['member:view-any', 'member:update']);
-$user->revokePermission('member:update');
-$user->syncDirectPermissions(['member:view-any']);
+$user->assignPermission(CustomerPermission::ALLOW_VIEW_ANY);
+$user->assignPermissions([MemberPermission::ALLOW_VIEW_ANY, MemberPermission::ALLOW_UPDATE]);
+$user->revokePermission(MemberPermission::ALLOW_UPDATE);
+$user->syncDirectPermissions([MemberPermission::ALLOW_VIEW_ANY]);
 $user->clearDirectPermissions();
 $direct = $user->getDirectPermissions(); // Collection
 ```
@@ -341,8 +344,8 @@ Route::middleware(['auth', 'access.role:owner,manager'])->group(function () {
 The package registers a `Gate::before` hook. If the user model has `hasPermission()`, then:
 
 ```php
-$user->can('member:view-any');
-Gate::allows('member:view-any', $user);
+$user->can(MemberPermission::ALLOW_VIEW_ANY->value);
+Gate::allows(MemberPermission::ALLOW_VIEW_ANY->value, $user);
 ```
 
 Both resolve through package permissions.
