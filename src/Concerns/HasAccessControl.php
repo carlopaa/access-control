@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Aapolrac\AccessControl\Concerns;
 
-use Aapolrac\AccessControl\Contracts\TenantResolver;
+use Aapolrac\AccessControl\Contracts\OrganizationResolver;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -85,6 +85,76 @@ trait HasAccessControl
     public function assignPermission(BackedEnum|string $permission): static
     {
         return $this->assignPermissions([$permission]);
+    }
+
+    public function assignRole(BackedEnum|string|int $role, mixed $organization): static
+    {
+        return $this->assignRoles([$role], $organization);
+    }
+
+    public function assignRoles(array $roles, mixed $organization): static
+    {
+        return $this->syncBelongsToManyInOrganization(
+            relation: 'roles',
+            ids: $this->resolveRoleIds($roles),
+            organization: $organization,
+            mode: 'attach'
+        );
+    }
+
+    public function syncRoles(array $roles, mixed $organization): static
+    {
+        return $this->syncBelongsToManyInOrganization(
+            relation: 'roles',
+            ids: $this->resolveRoleIds($roles),
+            organization: $organization,
+            mode: 'sync'
+        );
+    }
+
+    public function revokeRole(BackedEnum|string|int $role, mixed $organization): static
+    {
+        return $this->syncBelongsToManyInOrganization(
+            relation: 'roles',
+            ids: $this->resolveRoleIds([$role]),
+            organization: $organization,
+            mode: 'detach'
+        );
+    }
+
+    public function assignGroup(BackedEnum|string|int $group, mixed $organization): static
+    {
+        return $this->assignGroups([$group], $organization);
+    }
+
+    public function assignGroups(array $groups, mixed $organization): static
+    {
+        return $this->syncBelongsToManyInOrganization(
+            relation: 'groups',
+            ids: $this->resolveGroupIds($groups),
+            organization: $organization,
+            mode: 'attach'
+        );
+    }
+
+    public function syncGroups(array $groups, mixed $organization): static
+    {
+        return $this->syncBelongsToManyInOrganization(
+            relation: 'groups',
+            ids: $this->resolveGroupIds($groups),
+            organization: $organization,
+            mode: 'sync'
+        );
+    }
+
+    public function revokeGroup(BackedEnum|string|int $group, mixed $organization): static
+    {
+        return $this->syncBelongsToManyInOrganization(
+            relation: 'groups',
+            ids: $this->resolveGroupIds([$group]),
+            organization: $organization,
+            mode: 'detach'
+        );
     }
 
     public function assignPermissions(array $permissions): static
@@ -316,9 +386,136 @@ trait HasAccessControl
             return (int) $organization;
         }
 
-        /** @var TenantResolver $resolver */
-        $resolver = app(TenantResolver::class);
+        /** @var OrganizationResolver $resolver */
+        $resolver = app(OrganizationResolver::class);
 
         return $resolver->resolveOrganizationId();
+    }
+
+    protected function resolveRoleIds(array $roles): array
+    {
+        return $this->resolveRelationIds(
+            values: $roles,
+            modelClass: (string) config('access_control.models.role'),
+        );
+    }
+
+    protected function resolveGroupIds(array $groups): array
+    {
+        return $this->resolveRelationIds(
+            values: $groups,
+            modelClass: (string) config('access_control.models.group'),
+        );
+    }
+
+    protected function resolveRelationIds(array $values, string $modelClass): array
+    {
+        $normalizedValues = collect($values)
+            ->map(function ($value) {
+                if ($value instanceof BackedEnum) {
+                    return $value->value;
+                }
+
+                return $value;
+            })
+            ->filter(static fn ($value) => $value !== null && $value !== '')
+            ->values();
+
+        $ids = $normalizedValues
+            ->filter(static fn ($value) => is_int($value) || ctype_digit((string) $value))
+            ->map(static fn ($value) => (int) $value)
+            ->all();
+
+        $keys = $normalizedValues
+            ->filter(static fn ($value) => is_string($value) && ! ctype_digit($value))
+            ->map(static fn (string $value) => strtolower($value))
+            ->all();
+
+        $idsByKey = empty($keys)
+            ? []
+            : $modelClass::query()
+                ->whereIn('key', $keys)
+                ->pluck('id')
+                ->map(static fn ($id) => (int) $id)
+                ->all();
+
+        return array_values(array_unique([...$ids, ...$idsByKey]));
+    }
+
+    protected function syncBelongsToManyInOrganization(
+        string $relation,
+        array $ids,
+        mixed $organization,
+        string $mode
+    ): static {
+        $organizationId = $this->resolveOrganizationId($organization);
+
+        if ($organizationId === null) {
+            throw new \InvalidArgumentException('An organization is required for role and group assignments.');
+        }
+
+        $relatedIds = array_values(array_unique(array_map('intval', $ids)));
+
+        /** @var BelongsToMany $relationQuery */
+        $relationQuery = $this->{$relation}();
+
+        $payload = [];
+
+        foreach ($relatedIds as $id) {
+            $payload[$id] = ['organization_id' => $organizationId];
+        }
+
+        if ($mode === 'attach') {
+            if ($payload !== []) {
+                $relationQuery->syncWithoutDetaching($payload);
+            }
+
+            return $this;
+        }
+
+        $pivotTable = $relationQuery->getTable();
+        $relatedPivotKey = $relationQuery->getRelatedPivotKeyName();
+
+        if ($mode === 'detach') {
+            if ($relatedIds !== []) {
+                $this->{$relation}()
+                    ->newPivotStatement()
+                    ->where($relationQuery->getForeignPivotKeyName(), $this->getKey())
+                    ->where('organization_id', $organizationId)
+                    ->whereIn($relatedPivotKey, $relatedIds)
+                    ->delete();
+            }
+
+            return $this;
+        }
+
+        if ($mode === 'sync') {
+            $currentIds = $this->{$relation}()
+                ->newPivotStatement()
+                ->where($relationQuery->getForeignPivotKeyName(), $this->getKey())
+                ->where('organization_id', $organizationId)
+                ->pluck($relatedPivotKey)
+                ->map(static fn ($id) => (int) $id)
+                ->all();
+
+            $toDetach = array_values(array_diff($currentIds, $relatedIds));
+
+            if ($toDetach !== []) {
+                $this->{$relation}()
+                    ->newPivotStatement()
+                    ->where($relationQuery->getForeignPivotKeyName(), $this->getKey())
+                    ->where('organization_id', $organizationId)
+                    ->whereIn($relatedPivotKey, $toDetach)
+                    ->delete();
+            }
+
+            if ($payload !== []) {
+                $relationQuery->syncWithoutDetaching($payload);
+            }
+
+            return $this;
+        }
+
+        throw new \InvalidArgumentException("Unsupported sync mode [{$mode}] for relation [{$relation}].");
     }
 }

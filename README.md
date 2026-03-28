@@ -3,7 +3,7 @@
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/carlopaa/access-control.svg?style=flat-square)](https://packagist.org/packages/carlopaa/access-control)
 [![Total Downloads](https://img.shields.io/packagist/dt/carlopaa/access-control.svg?style=flat-square)](https://packagist.org/packages/carlopaa/access-control)
 
-`carlopaa/access-control` is a tenant-aware access control package for Laravel.
+`carlopaa/access-control` is an organization-aware access control package for Laravel.
 
 It combines role-based and permission-based patterns:
 
@@ -24,7 +24,7 @@ It combines role-based and permission-based patterns:
 - [Role to default group sync](#role-to-default-group-sync)
 - [Middleware](#middleware)
 - [Gate integration](#gate-integration)
-- [Tenant resolution](#tenant-resolution)
+- [Organization resolution](#organization-resolution)
 - [Testing](#testing)
 
 ## Installation
@@ -82,7 +82,7 @@ php artisan access-control:sync
 5. Use checks in code:
 
 ```php
-$user->hasRole('owner');
+$user->assignRole('owner', $organizationId);
 $user->hasPermission('member:view-any');
 ```
 
@@ -230,6 +230,22 @@ $user->hasRoleInOrg('owner', $organizationId);
 $user->hasAnyRoleInOrg(['owner', 'manager'], $organizationId);
 ```
 
+### Role and group assignment
+
+```php
+$user->assignRole('owner', $organizationId);
+$user->assignRoles(['owner', 'manager'], $organizationId);
+$user->syncRoles(['manager'], $organizationId);
+$user->revokeRole('owner', $organizationId);
+
+$user->assignGroup('team-management', $organizationId);
+$user->assignGroups(['team-management', 'reviewers'], $organizationId);
+$user->syncGroups(['reviewers'], $organizationId);
+$user->revokeGroup('team-management', $organizationId);
+```
+
+These helpers accept either model ids or keys and always scope the change to a specific organization.
+
 ### Query scopes
 
 ```php
@@ -305,22 +321,22 @@ Both resolve through package permissions.
 
 Additionally, enum-based permission abilities can be auto-registered from `permissions.enum_classes`.
 
-## Tenant resolution
+## Organization resolution
 
 If your checks/scopes need an implicit active organization, bind your own resolver:
 
 ```php
-use Aapolrac\AccessControl\Contracts\TenantResolver;
+use Aapolrac\AccessControl\Contracts\OrganizationResolver;
 
-app()->bind(TenantResolver::class, YourTenantResolver::class);
+app()->bind(OrganizationResolver::class, YourOrganizationResolver::class);
 ```
 
 Your resolver must return the current organization id (or `null`):
 
 ```php
-public function resolveOrganizationId(?Model $tenant = null): ?int
+public function resolveOrganizationId(?Model $organization = null): ?int
 {
-    return $tenant?->getKey() ? (int) $tenant->getKey() : null;
+    return $organization?->getKey() ? (int) $organization->getKey() : null;
 }
 ```
 

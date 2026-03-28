@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Aapolrac\AccessControl\AccessControl;
+use Aapolrac\AccessControl\Contracts\OrganizationResolver;
 use Aapolrac\AccessControl\Contracts\TenantResolver;
 use Aapolrac\AccessControl\Models\Group;
 use Aapolrac\AccessControl\Models\Permission;
@@ -12,6 +13,7 @@ use Aapolrac\AccessControl\Tests\Fixtures\CustomGroup;
 use Aapolrac\AccessControl\Tests\Fixtures\CustomPermission;
 use Aapolrac\AccessControl\Tests\Fixtures\CustomRole;
 use Aapolrac\AccessControl\Tests\Fixtures\Enums\MemberPermission;
+use Aapolrac\AccessControl\Tests\Fixtures\OrganizationResolver as TestOrganizationResolver;
 use Aapolrac\AccessControl\Tests\Fixtures\TenantResolver as TestTenantResolver;
 use Aapolrac\AccessControl\Tests\Fixtures\User;
 use Illuminate\Database\Schema\Blueprint;
@@ -50,7 +52,7 @@ it('checks roles and organization-aware scopes', function (): void {
     $firstUser->roles()->attach($owner->getKey(), ['organization_id' => 10]);
     $secondUser->roles()->attach($manager->getKey(), ['organization_id' => 20]);
 
-    app()->bind(TenantResolver::class, static fn () => new TestTenantResolver(20));
+    app()->bind(OrganizationResolver::class, static fn () => new TestOrganizationResolver(20));
 
     expect($firstUser->hasRole('owner'))->toBeTrue()
         ->and($firstUser->hasRoleInOrg('owner', 10))->toBeTrue()
@@ -58,6 +60,60 @@ it('checks roles and organization-aware scopes', function (): void {
         ->and(User::query()->withRole('owner')->pluck('id')->all())->toBe([$firstUser->id])
         ->and(User::query()->withRoleInOrg('manager', 20)->pluck('id')->all())->toBe([$secondUser->id])
         ->and(User::query()->withRoleInOrg('manager')->pluck('id')->all())->toBe([$secondUser->id]);
+});
+
+it('keeps the legacy tenant resolver binding working for backward compatibility', function (): void {
+    $owner = Role::query()->create(['name' => 'Owner', 'key' => 'owner']);
+    $user = User::query()->create();
+
+    $user->roles()->attach($owner->getKey(), ['organization_id' => 33]);
+
+    app()->bind(OrganizationResolver::class, static fn () => new TestTenantResolver(33));
+    app()->bind(TenantResolver::class, static fn () => new TestTenantResolver(33));
+
+    expect(User::query()->withRoleInOrg('owner')->pluck('id')->all())->toBe([$user->id]);
+});
+
+it('provides organization-scoped role and group assignment helpers', function (): void {
+    $owner = Role::query()->create(['name' => 'Owner', 'key' => 'owner']);
+    $manager = Role::query()->create(['name' => 'Manager', 'key' => 'manager']);
+    $owners = Group::query()->create(['name' => 'Owners', 'key' => 'owners']);
+    $reviewers = Group::query()->create(['name' => 'Reviewers', 'key' => 'reviewers']);
+    $user = User::create();
+
+    $user->assignRole('owner', 12)
+        ->assignRole($manager->id, 12)
+        ->assignGroup('owners', 12)
+        ->assignGroup($reviewers->id, 12);
+
+    expect($user->hasAnyRoleInOrg(['owner', 'manager'], 12))->toBeTrue()
+        ->and($user->groups()->wherePivot('organization_id', 12)->pluck('key')->all())
+            ->toEqualCanonicalizing([$owners->key, $reviewers->key]);
+
+    $user->syncRoles(['manager'], 12)
+        ->syncGroups(['reviewers'], 12);
+
+    expect($user->fresh()->hasRoleInOrg('owner', 12))->toBeFalse()
+        ->and($user->fresh()->hasRoleInOrg('manager', 12))->toBeTrue()
+        ->and($user->fresh()->groups()->wherePivot('organization_id', 12)->pluck('key')->all())
+            ->toEqualCanonicalizing([$reviewers->key]);
+
+    $user->revokeRole('manager', 12)
+        ->revokeGroup('reviewers', 12);
+
+    expect($user->fresh()->hasAnyRoleInOrg(['owner', 'manager'], 12))->toBeFalse()
+        ->and($user->fresh()->groups()->wherePivot('organization_id', 12)->exists())->toBeFalse();
+});
+
+it('requires an organization for role and group assignment helpers', function (): void {
+    Role::query()->create(['name' => 'Owner', 'key' => 'owner']);
+    Group::query()->create(['name' => 'Owners', 'key' => 'owners']);
+    $user = User::create();
+
+    expect(fn () => $user->assignRole('owner', null))
+        ->toThrow(InvalidArgumentException::class)
+        ->and(fn () => $user->assignGroup('owners', null))
+        ->toThrow(InvalidArgumentException::class);
 });
 
 it('syncs permissions from configured enums and integrates with gates', function (): void {

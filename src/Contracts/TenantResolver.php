@@ -6,7 +6,8 @@ namespace Aapolrac\AccessControl\Contracts;
 
 use Illuminate\Database\Eloquent\Model;
 
-interface TenantResolver
+interface TenantResolver extends OrganizationResolver
 {
+    /** @deprecated Use OrganizationResolver instead. */
     public function resolveOrganizationId(?Model $tenant = null): ?int;
 }

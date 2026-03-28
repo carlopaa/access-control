@@ -6,9 +6,11 @@ namespace Aapolrac\AccessControl;
 
 use Aapolrac\AccessControl\Commands\AccessControlCommand;
 use Aapolrac\AccessControl\Commands\SyncPermissionsCommand;
+use Aapolrac\AccessControl\Contracts\OrganizationResolver;
 use Aapolrac\AccessControl\Contracts\TenantResolver;
 use Aapolrac\AccessControl\Middleware\CheckPermission;
 use Aapolrac\AccessControl\Middleware\CheckRole;
+use Aapolrac\AccessControl\Support\DefaultOrganizationResolver;
 use Aapolrac\AccessControl\Support\DefaultTenantResolver;
 use Aapolrac\AccessControl\Support\GateRegistrar;
 use Illuminate\Routing\Router;
@@ -36,7 +38,8 @@ class AccessControlServiceProvider extends PackageServiceProvider
     public function packageRegistered(): void
     {
         $this->app->singleton(AccessControl::class, static fn (): AccessControl => new AccessControl);
-        $this->app->singleton(TenantResolver::class, DefaultTenantResolver::class);
+        $this->app->singleton(OrganizationResolver::class, DefaultOrganizationResolver::class);
+        $this->app->singleton(TenantResolver::class, static fn ($app): OrganizationResolver => $app->make(OrganizationResolver::class));
     }
 
     public function packageBooted(): void
