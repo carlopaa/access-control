@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Aapolrac\AccessControl;
 
 use Aapolrac\AccessControl\Commands\AccessControlCommand;
+use Aapolrac\AccessControl\Commands\InstallAccessControlCommand;
 use Aapolrac\AccessControl\Commands\MakePermissionsEnumCommand;
 use Aapolrac\AccessControl\Commands\SyncPermissionsCommand;
 use Aapolrac\AccessControl\Contracts\OrganizationResolver;
@@ -35,6 +36,7 @@ class AccessControlServiceProvider extends PackageServiceProvider
             ->hasMigration('create_role_user_table')
             ->hasMigration('create_group_user_table')
             ->hasCommand(AccessControlCommand::class)
+            ->hasCommand(InstallAccessControlCommand::class)
             ->hasCommand(MakePermissionsEnumCommand::class)
             ->hasCommand(SyncPermissionsCommand::class);
     }

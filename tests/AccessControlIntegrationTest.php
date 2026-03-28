@@ -154,6 +154,83 @@ it('syncs permissions from configured enums and integrates with gates', function
             ->toEqualCanonicalizing([MemberPermission::ViewAny->value, MemberPermission::Update->value]);
 });
 
+it('installs config and migrations with a configurable scope setup', function (): void {
+    $configDirectory = base_path('build/install-config');
+    $migrationsDirectory = base_path('build/install-migrations');
+    $configPath = $configDirectory.'/access_control.php';
+
+    File::deleteDirectory($configDirectory);
+    File::deleteDirectory($migrationsDirectory);
+
+    $this->artisan('access-control:install', [
+        '--scope-model' => 'App\\Models\\Team',
+        '--scope-key' => 'team_id',
+        '--config-path' => $configPath,
+        '--migrations-path' => $migrationsDirectory,
+    ])->assertSuccessful();
+
+    expect(File::exists($configPath))->toBeTrue();
+
+    $configContents = File::get($configPath);
+
+    expect($configContents)->toContain("'model' => App\\Models\\Team::class,")
+        ->and($configContents)->toContain("'foreign_key' => 'team_id',");
+
+    $migrationFiles = collect(File::files($migrationsDirectory))->map->getFilename()->all();
+
+    expect(collect($migrationFiles)->contains(fn (string $file): bool => str_ends_with($file, 'create_role_user_table.php')))->toBeTrue()
+        ->and(collect($migrationFiles)->contains(fn (string $file): bool => str_ends_with($file, 'create_group_user_table.php')))->toBeTrue();
+});
+
+it('can install access control interactively with a discovered scope model', function (): void {
+    $configDirectory = base_path('build/install-config-interactive');
+    $migrationsDirectory = base_path('build/install-migrations-interactive');
+    $configPath = $configDirectory.'/access_control.php';
+    $modelsPath = app_path('Models');
+    $modelFilePath = $modelsPath.'/Team.php';
+    $appNamespace = app()->getNamespace();
+
+    File::deleteDirectory($configDirectory);
+    File::deleteDirectory($migrationsDirectory);
+    File::ensureDirectoryExists($modelsPath);
+    File::put($modelFilePath, <<<PHP
+<?php
+
+namespace {$appNamespace}Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Team extends Model {}
+PHP);
+    require_once $modelFilePath;
+
+    try {
+        $this->artisan('access-control:install', [
+            '--config-path' => $configPath,
+            '--migrations-path' => $migrationsDirectory,
+        ])
+            ->expectsSearch(
+                'What model should access control use as its scope? (Optional)',
+                $appNamespace.'Models\\Team',
+                'Team',
+                [
+                    '__none' => 'No scope model',
+                    '__custom' => 'Custom model class',
+                    $appNamespace.'Models\\Team' => 'Team',
+                ],
+            )
+            ->expectsQuestion('What foreign key should be used on the pivot tables?', 'team_id')
+            ->assertSuccessful();
+    } finally {
+        File::delete($modelFilePath);
+    }
+
+    $configContents = File::get($configPath);
+
+    expect($configContents)->toContain("'model' => {$appNamespace}Models\\Team::class,")
+        ->and($configContents)->toContain("'foreign_key' => 'team_id',");
+});
+
 it('generates a permissions enum for a resource', function (): void {
     $directory = base_path('build/generated-enums');
     $filePath = $directory.'/CustomerPermission.php';

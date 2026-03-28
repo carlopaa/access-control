@@ -150,8 +150,8 @@ return [
     ],
 
     'scope' => [
-        'model' => App\Models\Wedding::class,
-        'foreign_key' => 'wedding_id',
+        'model' => App\Models\Team::class,
+        'foreign_key' => 'team_id',
     ],
 
     'permissions' => [
@@ -193,6 +193,12 @@ Check package installation:
 
 ```bash
 php artisan access-control
+```
+
+Install config and migrations with a guided setup:
+
+```bash
+php artisan access-control:install
 ```
 
 Sync permission records from configured enum classes:
@@ -358,8 +364,8 @@ Configure the scope model and foreign key to match your domain:
 
 ```php
 'scope' => [
-    'model' => App\Models\Wedding::class,
-    'foreign_key' => 'wedding_id',
+    'model' => App\Models\Team::class,
+    'foreign_key' => 'team_id',
 ],
 ```
 
