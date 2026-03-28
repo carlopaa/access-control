@@ -26,6 +26,11 @@ class Role extends Model
             config('access_control.tables.role_user', 'role_user'),
             'role_id',
             'user_id'
-        )->withPivot('organization_id')->withTimestamps();
+        )->withPivot($this->scopeForeignKey())->withTimestamps();
+    }
+
+    protected function scopeForeignKey(): string
+    {
+        return (string) config('access_control.scope.foreign_key', 'organization_id');
     }
 }

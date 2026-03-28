@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Aapolrac\AccessControl\AccessControl;
 use Aapolrac\AccessControl\Contracts\OrganizationResolver;
+use Aapolrac\AccessControl\Contracts\ScopeResolver;
 use Aapolrac\AccessControl\Contracts\TenantResolver;
 use Aapolrac\AccessControl\Models\Group;
 use Aapolrac\AccessControl\Models\Permission;
@@ -14,8 +15,10 @@ use Aapolrac\AccessControl\Tests\Fixtures\CustomPermission;
 use Aapolrac\AccessControl\Tests\Fixtures\CustomRole;
 use Aapolrac\AccessControl\Tests\Fixtures\Enums\MemberPermission;
 use Aapolrac\AccessControl\Tests\Fixtures\OrganizationResolver as TestOrganizationResolver;
+use Aapolrac\AccessControl\Tests\Fixtures\ScopeResolver as TestScopeResolver;
 use Aapolrac\AccessControl\Tests\Fixtures\TenantResolver as TestTenantResolver;
 use Aapolrac\AccessControl\Tests\Fixtures\User;
+use Aapolrac\AccessControl\Tests\Fixtures\Wedding;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
@@ -56,11 +59,24 @@ it('checks roles and organization-aware scopes', function (): void {
     app()->bind(OrganizationResolver::class, static fn () => new TestOrganizationResolver(20));
 
     expect($firstUser->hasRole('owner'))->toBeTrue()
+        ->and($firstUser->hasRoleInScope('owner', 10))->toBeTrue()
         ->and($firstUser->hasRoleInOrg('owner', 10))->toBeTrue()
         ->and($firstUser->hasRoleInOrg('owner', 20))->toBeFalse()
         ->and(User::query()->withRole('owner')->pluck('id')->all())->toBe([$firstUser->id])
+        ->and(User::query()->withRoleInScope('manager', 20)->pluck('id')->all())->toBe([$secondUser->id])
         ->and(User::query()->withRoleInOrg('manager', 20)->pluck('id')->all())->toBe([$secondUser->id])
         ->and(User::query()->withRoleInOrg('manager')->pluck('id')->all())->toBe([$secondUser->id]);
+});
+
+it('uses the scope resolver binding when resolving the active scope', function (): void {
+    $owner = Role::query()->create(['name' => 'Owner', 'key' => 'owner']);
+    $user = User::query()->create();
+
+    $user->roles()->attach($owner->getKey(), ['organization_id' => 44]);
+
+    app()->bind(ScopeResolver::class, static fn () => new TestScopeResolver(44));
+
+    expect(User::query()->withRoleInScope('owner')->pluck('id')->all())->toBe([$user->id]);
 });
 
 it('keeps the legacy tenant resolver binding working for backward compatibility', function (): void {
@@ -88,6 +104,7 @@ it('provides organization-scoped role and group assignment helpers', function ()
         ->assignGroup($reviewers->id, 12);
 
     expect($user->hasAnyRoleInOrg(['owner', 'manager'], 12))->toBeTrue()
+        ->and($user->hasAnyRoleInScope(['owner', 'manager'], 12))->toBeTrue()
         ->and($user->groups()->wherePivot('organization_id', 12)->pluck('key')->all())
             ->toEqualCanonicalizing([$owners->key, $reviewers->key]);
 
@@ -318,6 +335,10 @@ it('honors custom model and table overrides across relationships and sync helper
     config()->set('access_control.models.role', CustomRole::class);
     config()->set('access_control.models.group', CustomGroup::class);
     config()->set('access_control.models.permission', CustomPermission::class);
+    config()->set('access_control.scope', [
+        'model' => Wedding::class,
+        'foreign_key' => 'wedding_id',
+    ]);
     config()->set('access_control.tables', [
         'roles' => 'acl_roles',
         'groups' => 'acl_groups',
@@ -331,28 +352,36 @@ it('honors custom model and table overrides across relationships and sync helper
     ]);
 
     createCustomAccessControlTables();
+    Schema::create('weddings', function (Blueprint $table): void {
+        $table->id();
+        $table->string('name')->nullable();
+        $table->timestamps();
+    });
 
     $role = CustomRole::query()->create(['name' => 'Owner', 'key' => 'owner']);
     $group = CustomGroup::query()->create(['name' => 'Owners', 'key' => 'owners']);
     $permission = CustomPermission::query()->create(['name' => 'reports:view']);
+    $wedding = Wedding::query()->create(['name' => 'A & B']);
     $user = User::create();
 
     $group->permissions()->attach($permission);
-    $user->roles()->attach($role->getKey(), ['organization_id' => 77]);
-    $user->groups()->attach($group->getKey(), ['organization_id' => 77]);
+    $user->assignRoleInScope($role->id, $wedding);
+    $user->assignGroupInScope($group->id, $wedding);
 
     expect($user->roles()->getRelated()::class)->toBe(CustomRole::class)
         ->and($user->groups()->getRelated()::class)->toBe(CustomGroup::class)
         ->and((new CustomRole)->getTable())->toBe('acl_roles')
         ->and((new CustomGroup)->getTable())->toBe('acl_groups')
         ->and((new CustomPermission)->getTable())->toBe('acl_permissions')
-        ->and($user->hasRoleInOrg('owner', 77))->toBeTrue()
+        ->and(config('access_control.scope.model'))->toBe(Wedding::class)
+        ->and(config('access_control.scope.foreign_key'))->toBe('wedding_id')
+        ->and($user->hasRoleInScope('owner', (int) $wedding->getKey()))->toBeTrue()
         ->and($user->hasPermission('reports:view'))->toBeTrue()
-        ->and(User::query()->withRoleInOrg('owner', 77)->pluck('id')->all())->toBe([$user->id]);
+        ->and(User::query()->withRoleInScope('owner', $wedding)->pluck('id')->all())->toBe([$user->id]);
 
-    RoleGroupSync::syncDefaultsForRoles($user, 77, ['owner']);
+    RoleGroupSync::syncDefaultsForRoles($user, $wedding, ['owner']);
 
-    expect($user->fresh()->groups()->wherePivot('organization_id', 77)->pluck('key')->all())
+    expect($user->fresh()->groups()->wherePivot('wedding_id', (int) $wedding->getKey())->pluck('key')->all())
         ->toEqualCanonicalizing([$group->key]);
 });
 
@@ -383,7 +412,7 @@ function createCustomAccessControlTables(): void
         $table->id();
         $table->unsignedBigInteger('user_id');
         $table->unsignedBigInteger('role_id');
-        $table->unsignedBigInteger('organization_id');
+        $table->unsignedBigInteger('wedding_id');
         $table->timestamps();
     });
 
@@ -391,7 +420,7 @@ function createCustomAccessControlTables(): void
         $table->id();
         $table->unsignedBigInteger('group_id');
         $table->unsignedBigInteger('user_id');
-        $table->unsignedBigInteger('organization_id')->nullable();
+        $table->unsignedBigInteger('wedding_id')->nullable();
         $table->timestamps();
     });
 

@@ -3,11 +3,11 @@
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/carlopaa/access-control.svg?style=flat-square)](https://packagist.org/packages/carlopaa/access-control)
 [![Total Downloads](https://img.shields.io/packagist/dt/carlopaa/access-control.svg?style=flat-square)](https://packagist.org/packages/carlopaa/access-control)
 
-`carlopaa/access-control` is an organization-aware access control package for Laravel.
+`carlopaa/access-control` is a scope-aware access control package for Laravel.
 
 It combines role-based and permission-based patterns:
 
-- users get roles in an organization context
+- users get roles in a configurable scope context
 - roles can map to default groups
 - groups aggregate permissions
 - users can also receive direct permissions
@@ -24,7 +24,7 @@ It combines role-based and permission-based patterns:
 - [Role to default group sync](#role-to-default-group-sync)
 - [Middleware](#middleware)
 - [Gate integration](#gate-integration)
-- [Organization resolution](#organization-resolution)
+- [Scope resolution](#scope-resolution)
 - [Testing](#testing)
 
 ## Installation
@@ -82,7 +82,7 @@ php artisan access-control:sync
 5. Use checks in code:
 
 ```php
-$user->assignRole('owner', $organizationId);
+$user->assignRole('owner', $scopeId);
 $user->hasPermission('member:view-any');
 ```
 
@@ -99,7 +99,7 @@ public function roles(): BelongsToMany
     return $this->belongsToMany(
         Role::class,
         config('access_control.tables.role_user', 'role_user')
-    )->withPivot('organization_id')->withTimestamps();
+    )->withPivot(config('access_control.scope.foreign_key', 'organization_id'))->withTimestamps();
 }
 
 public function groups(): BelongsToMany
@@ -107,7 +107,7 @@ public function groups(): BelongsToMany
     return $this->belongsToMany(
         Group::class,
         config('access_control.tables.group_user', 'group_user')
-    )->withPivot('organization_id')->withTimestamps();
+    )->withPivot(config('access_control.scope.foreign_key', 'organization_id'))->withTimestamps();
 }
 ```
 
@@ -147,6 +147,11 @@ return [
     'context_cache' => [
         'enabled' => true,
         'key' => 'permissions',
+    ],
+
+    'scope' => [
+        'model' => App\Models\Wedding::class,
+        'foreign_key' => 'wedding_id',
     ],
 
     'permissions' => [
@@ -239,6 +244,8 @@ $direct = $user->getDirectPermissions(); // Collection
 ```php
 $user->hasRole('owner');
 $user->hasAnyRole(['owner', 'manager']);
+$user->hasRoleInScope('owner', $scopeId);
+$user->hasAnyRoleInScope(['owner', 'manager'], $scopeId);
 $user->hasRoleInOrg('owner', $organizationId);
 $user->hasAnyRoleInOrg(['owner', 'manager'], $organizationId);
 ```
@@ -246,24 +253,26 @@ $user->hasAnyRoleInOrg(['owner', 'manager'], $organizationId);
 ### Role and group assignment
 
 ```php
-$user->assignRole('owner', $organizationId);
-$user->assignRoles(['owner', 'manager'], $organizationId);
-$user->syncRoles(['manager'], $organizationId);
-$user->revokeRole('owner', $organizationId);
+$user->assignRole('owner', $scopeId);
+$user->assignRoles(['owner', 'manager'], $scopeId);
+$user->syncRoles(['manager'], $scopeId);
+$user->revokeRole('owner', $scopeId);
 
-$user->assignGroup('team-management', $organizationId);
-$user->assignGroups(['team-management', 'reviewers'], $organizationId);
-$user->syncGroups(['reviewers'], $organizationId);
-$user->revokeGroup('team-management', $organizationId);
+$user->assignGroup('team-management', $scopeId);
+$user->assignGroups(['team-management', 'reviewers'], $scopeId);
+$user->syncGroups(['reviewers'], $scopeId);
+$user->revokeGroup('team-management', $scopeId);
 ```
 
-These helpers accept either model ids or keys and always scope the change to a specific organization.
+These helpers accept ids, keys, or a scope model instance and always scope the change to a specific scope record.
 
 ### Query scopes
 
 ```php
 User::query()->withRole('owner')->get();
 User::query()->withAnyRoles(['owner', 'manager'])->get();
+User::query()->withRoleInScope('owner', $scopeId)->get();
+User::query()->withAnyRolesInScope(['owner', 'manager'], $scopeId)->get();
 User::query()->withRoleInOrg('owner', $organizationId)->get();
 User::query()->withAnyRolesInOrg(['owner', 'manager'], $organizationId)->get();
 ```
@@ -275,13 +284,13 @@ Use `RoleGroupSync` when role assignment should automatically maintain configure
 ```php
 use Aapolrac\AccessControl\Support\RoleGroupSync;
 
-RoleGroupSync::syncDefaultsForRoles($user, $organizationId, ['owner', 'manager']);
+RoleGroupSync::syncDefaultsForRoles($user, $scopeId, ['owner', 'manager']);
 ```
 
 You can also attach explicit groups by key or id:
 
 ```php
-RoleGroupSync::attach($user, $organizationId, ['team-management', 5]);
+RoleGroupSync::attach($user, $scopeId, ['team-management', 5]);
 ```
 
 ## Troubleshooting
@@ -334,24 +343,36 @@ Both resolve through package permissions.
 
 Additionally, enum-based permission abilities can be auto-registered from `permissions.enum_classes`.
 
-## Organization resolution
+## Scope resolution
 
-If your checks/scopes need an implicit active organization, bind your own resolver:
+If your checks/scopes need an implicit active scope, bind your own resolver:
 
 ```php
-use Aapolrac\AccessControl\Contracts\OrganizationResolver;
+use Aapolrac\AccessControl\Contracts\ScopeResolver;
 
-app()->bind(OrganizationResolver::class, YourOrganizationResolver::class);
+app()->bind(ScopeResolver::class, YourScopeResolver::class);
 ```
 
-Your resolver must return the current organization id (or `null`):
+The package does not create the scope model table for you. Your application owns that structure.
+Configure the scope model and foreign key to match your domain:
 
 ```php
-public function resolveOrganizationId(?Model $organization = null): ?int
+'scope' => [
+    'model' => App\Models\Wedding::class,
+    'foreign_key' => 'wedding_id',
+],
+```
+
+Your resolver must return the current scope id (or `null`):
+
+```php
+public function resolveScopeId(?Model $scope = null): ?int
 {
-    return $organization?->getKey() ? (int) $organization->getKey() : null;
+    return $scope?->getKey() ? (int) $scope->getKey() : null;
 }
 ```
+
+`OrganizationResolver` and `TenantResolver` remain available as backward-compatible aliases, but `ScopeResolver` is the preferred abstraction going forward.
 
 ## Testing
 

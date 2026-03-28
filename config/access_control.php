@@ -25,6 +25,11 @@ return [
         'key' => 'permissions',
     ],
 
+    'scope' => [
+        'model' => null,
+        'foreign_key' => 'organization_id',
+    ],
+
     /*
      * Register permission Gate abilities automatically at boot from these enum classes.
      * Example: 'enum_classes' => [\App\Enums\MemberPermission::class, \App\Enums\CustomerPermission::class]

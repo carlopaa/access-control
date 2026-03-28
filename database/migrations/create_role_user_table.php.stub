@@ -9,14 +9,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create(config('access_control.tables.role_user', 'role_user'), function (Blueprint $table) {
+            $scopeForeignKey = (string) config('access_control.scope.foreign_key', 'organization_id');
             $table->id();
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('role_id');
-            $table->unsignedBigInteger('organization_id');
+            $table->unsignedBigInteger($scopeForeignKey);
             $table->timestamps();
 
-            $table->unique(['user_id', 'role_id', 'organization_id'], 'access_control_role_user_unique');
-            $table->index(['organization_id', 'role_id'], 'access_control_role_user_org_role_index');
+            $table->unique(['user_id', 'role_id', $scopeForeignKey], 'access_control_role_user_scope_unique');
+            $table->index([$scopeForeignKey, 'role_id'], 'access_control_role_user_scope_role_index');
         });
     }
 

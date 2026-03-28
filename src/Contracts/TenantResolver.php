@@ -8,6 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 
 interface TenantResolver extends OrganizationResolver
 {
-    /** @deprecated Use OrganizationResolver instead. */
+    /** @deprecated Use ScopeResolver instead. */
     public function resolveOrganizationId(?Model $tenant = null): ?int;
 }

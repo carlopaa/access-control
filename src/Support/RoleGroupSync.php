@@ -9,9 +9,10 @@ use Illuminate\Support\Facades\DB;
 
 class RoleGroupSync
 {
-    public static function attach(Model $user, Model|int $organization, array $groups): void
+    public static function attach(Model $user, Model|int $scope, array $groups): void
     {
-        $orgId = $organization instanceof Model ? (int) $organization->getKey() : (int) $organization;
+        $scopeId = $scope instanceof Model ? (int) $scope->getKey() : (int) $scope;
+        $scopeForeignKey = static::scopeForeignKey();
 
         $groupIds = static::resolveGroupIds($groups);
 
@@ -21,7 +22,7 @@ class RoleGroupSync
 
         /** @phpstan-ignore method.notFound */
         $alreadyAttached = $user->groups()
-            ->wherePivot('organization_id', $orgId)
+            ->wherePivot($scopeForeignKey, $scopeId)
             ->pluck(static::groupTable().'.id')
             ->all();
 
@@ -34,16 +35,17 @@ class RoleGroupSync
         $payload = [];
 
         foreach ($toAttach as $groupId) {
-            $payload[$groupId] = ['organization_id' => $orgId];
+            $payload[$groupId] = [$scopeForeignKey => $scopeId];
         }
 
         /** @phpstan-ignore method.notFound */
         $user->groups()->attach($payload);
     }
 
-    public static function syncDefaultsForRoles(Model $user, Model|int $organization, array $roleKeys): void
+    public static function syncDefaultsForRoles(Model $user, Model|int $scope, array $roleKeys): void
     {
-        $orgId = $organization instanceof Model ? (int) $organization->getKey() : (int) $organization;
+        $scopeId = $scope instanceof Model ? (int) $scope->getKey() : (int) $scope;
+        $scopeForeignKey = static::scopeForeignKey();
         $map = (array) config('access_control.groups', []);
 
         $managedGroupKeys = collect($map)->flatten()->unique()->values();
@@ -67,7 +69,7 @@ class RoleGroupSync
 
         $currentManagedIds = DB::table(static::groupUserTable())
             ->where('user_id', $user->getKey())
-            ->where('organization_id', $orgId)
+            ->where($scopeForeignKey, $scopeId)
             ->whereIn('group_id', $managedGroupIds)
             ->pluck('group_id')
             ->all();
@@ -79,7 +81,7 @@ class RoleGroupSync
             $attach = [];
 
             foreach ($toAttach as $groupId) {
-                $attach[$groupId] = ['organization_id' => $orgId];
+                $attach[$groupId] = [$scopeForeignKey => $scopeId];
             }
 
             /** @phpstan-ignore method.notFound */
@@ -89,17 +91,17 @@ class RoleGroupSync
         if (! empty($toDetach)) {
             DB::table(static::groupUserTable())
                 ->where('user_id', $user->getKey())
-                ->where('organization_id', $orgId)
+                ->where($scopeForeignKey, $scopeId)
                 ->whereIn('group_id', $toDetach)
                 ->delete();
         }
     }
 
-    public static function attachDefaultsForRole(Model $user, Model|int $organization, string|array $roleKey): void
+    public static function attachDefaultsForRole(Model $user, Model|int $scope, string|array $roleKey): void
     {
         $roleKeys = is_array($roleKey) ? $roleKey : [$roleKey];
 
-        static::syncDefaultsForRoles($user, $organization, $roleKeys);
+        static::syncDefaultsForRoles($user, $scope, $roleKeys);
     }
 
     public static function roleToDefaultGroupsMap(): array
@@ -133,5 +135,10 @@ class RoleGroupSync
     protected static function groupUserTable(): string
     {
         return (string) config('access_control.tables.group_user', 'group_user');
+    }
+
+    protected static function scopeForeignKey(): string
+    {
+        return (string) config('access_control.scope.foreign_key', 'organization_id');
     }
 }

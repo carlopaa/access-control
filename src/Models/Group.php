@@ -26,7 +26,7 @@ class Group extends Model
             config('access_control.tables.group_user', 'group_user'),
             'group_id',
             'user_id'
-        )->withPivot('organization_id')->withTimestamps();
+        )->withPivot($this->scopeForeignKey())->withTimestamps();
     }
 
     public function permissions(): BelongsToMany
@@ -37,5 +37,10 @@ class Group extends Model
             'group_id',
             'permission_id'
         )->withTimestamps();
+    }
+
+    protected function scopeForeignKey(): string
+    {
+        return (string) config('access_control.scope.foreign_key', 'organization_id');
     }
 }

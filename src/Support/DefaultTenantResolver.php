@@ -8,9 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class DefaultTenantResolver extends DefaultOrganizationResolver
 {
-    /** @deprecated Use DefaultOrganizationResolver instead. */
+    /** @deprecated Use DefaultScopeResolver instead. */
     public function resolveOrganizationId(?Model $tenant = null): ?int
     {
-        return parent::resolveOrganizationId($tenant);
+        return $this->resolveScopeId($tenant);
     }
 }

@@ -6,7 +6,8 @@ namespace Aapolrac\AccessControl\Contracts;
 
 use Illuminate\Database\Eloquent\Model;
 
-interface OrganizationResolver
+interface OrganizationResolver extends ScopeResolver
 {
+    /** @deprecated Use resolveScopeId instead. */
     public function resolveOrganizationId(?Model $organization = null): ?int;
 }
