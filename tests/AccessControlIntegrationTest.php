@@ -164,22 +164,49 @@ it('generates a permissions enum for a resource', function (): void {
 it('can generate a permissions enum interactively', function (): void {
     $directory = base_path('build/generated-enums-interactive');
     $filePath = $directory.'/WeddingPermission.php';
+    $modelsPath = app_path('Models');
+    $modelFilePath = $modelsPath.'/Guest.php';
+    $appNamespace = app()->getNamespace();
 
     File::deleteDirectory($directory);
+    File::ensureDirectoryExists($modelsPath);
+    File::put($modelFilePath, <<<PHP
+<?php
 
-    $this->artisan('access-control:make-enum', [
-        '--path' => $directory,
-    ])
-        ->expectsQuestion('What should the enum be called?', 'WeddingPermission')
-        ->expectsQuestion('What model or resource should these permissions use?', 'wedding')
-        ->expectsConfirmation('Include deny permissions too?', 'yes')
-        ->assertSuccessful();
+namespace {$appNamespace}Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Guest extends Model {}
+PHP);
+    require_once $modelFilePath;
+
+    try {
+        $this->artisan('access-control:make-enum', [
+            '--path' => $directory,
+        ])
+            ->expectsQuestion('What should the enum be named?', 'WeddingPermission')
+            ->expectsSearch(
+                'What model should these permissions apply to?',
+                'Guest',
+                'Guest',
+                [
+                    '__custom' => 'Custom resource',
+                    $appNamespace.'Models\\Guest' => 'Guest',
+                ],
+            )
+            ->expectsConfirmation('Include deny permissions too?', 'yes')
+            ->assertSuccessful();
+    } finally {
+        File::delete($modelFilePath);
+    }
 
     $contents = File::get($filePath);
 
     expect($contents)->toContain("enum WeddingPermission: string")
-        ->and($contents)->toContain("case ALLOW_VIEW = 'wedding:view';")
-        ->and($contents)->toContain("case DENY_VIEW = 'wedding:view:deny';");
+        ->and($contents)->not->toContain('declare(strict_types=1);')
+        ->and($contents)->toContain("case ALLOW_VIEW = 'guest:view';")
+        ->and($contents)->toContain("case DENY_VIEW = 'guest:view:deny';");
 });
 
 it('can include deny cases when generating a permissions enum', function (): void {

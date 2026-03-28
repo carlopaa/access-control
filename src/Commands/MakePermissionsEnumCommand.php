@@ -5,7 +5,15 @@ declare(strict_types=1);
 namespace Aapolrac\AccessControl\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use SplFileInfo;
+
+use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\search;
+use function Laravel\Prompts\text;
 
 class MakePermissionsEnumCommand extends Command
 {
@@ -59,7 +67,12 @@ class MakePermissionsEnumCommand extends Command
         $name = trim((string) $this->argument('name'));
 
         if ($name === '') {
-            $name = trim((string) $this->ask('What should the enum be called?', 'ModelPermission'));
+            $name = text(
+                label: 'What should the enum be named?',
+                placeholder: 'E.g. PostPermission',
+                default: 'ModelPermission',
+                required: true,
+            );
         }
 
         return $this->qualifyClassName($name);
@@ -88,7 +101,7 @@ class MakePermissionsEnumCommand extends Command
                 ->lower();
 
             if (trim((string) $this->argument('name')) === '') {
-                $configured = trim((string) $this->ask('What model or resource should these permissions use?', $configured));
+                $configured = $this->promptForResource($configured);
             }
         }
 
@@ -122,7 +135,102 @@ class MakePermissionsEnumCommand extends Command
             return false;
         }
 
-        return (bool) $this->confirm('Include deny permissions too?', true);
+        return confirm(
+            label: 'Include deny permissions too?',
+            default: true,
+        );
+    }
+
+    protected function promptForResource(string $default): string
+    {
+        $models = $this->discoverApplicationModels();
+
+        if ($models === []) {
+            return text(
+                label: 'What model or resource should these permissions use?',
+                placeholder: 'E.g. post',
+                default: $default,
+                required: true,
+            );
+        }
+
+        $selected = (string) search(
+            label: 'What model should these permissions apply to?',
+            placeholder: 'Start typing a model name',
+            options: function (string $value) use ($models): array {
+                $filtered = collect($models)
+                    ->filter(function (string $label, string $class) use ($value): bool {
+                        if ($value === '') {
+                            return true;
+                        }
+
+                        return str_contains(Str::lower($label), Str::lower($value))
+                            || str_contains(Str::lower($class), Str::lower($value));
+                    })
+                    ->take(10)
+                    ->all();
+
+                return ['__custom' => 'Custom resource'] + $filtered;
+            },
+        );
+
+        if ($selected === '__custom') {
+            return text(
+                label: 'What resource key should these permissions use?',
+                placeholder: 'E.g. post',
+                default: $default,
+                required: true,
+            );
+        }
+
+        return (string) Str::of(class_basename($selected))
+            ->snake()
+            ->replace('_', '-')
+            ->lower();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function discoverApplicationModels(): array
+    {
+        if (! function_exists('app_path')) {
+            return [];
+        }
+
+        $modelsPath = app_path('Models');
+
+        if (! is_dir($modelsPath)) {
+            return [];
+        }
+
+        $namespace = app()->getNamespace().'Models\\';
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($modelsPath));
+        $models = [];
+
+        /** @var SplFileInfo $file */
+        foreach ($iterator as $file) {
+            if (! $file->isFile() || $file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $relativePath = str_replace($modelsPath.DIRECTORY_SEPARATOR, '', $file->getPathname());
+            $class = $namespace.str_replace(
+                [DIRECTORY_SEPARATOR, '.php'],
+                ['\\', ''],
+                $relativePath
+            );
+
+            if (! class_exists($class) || ! is_subclass_of($class, Model::class)) {
+                continue;
+            }
+
+            $models[$class] = class_basename($class);
+        }
+
+        asort($models);
+
+        return $models;
     }
 
     protected function buildEnumContents(
@@ -145,8 +253,6 @@ class MakePermissionsEnumCommand extends Command
 
         return <<<PHP
 <?php
-
-declare(strict_types=1);
 
 namespace {$namespace};
 
