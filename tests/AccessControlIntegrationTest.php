@@ -161,6 +161,27 @@ it('generates a permissions enum for a resource', function (): void {
         ->and($contents)->not->toContain('DENY_VIEW');
 });
 
+it('can generate a permissions enum interactively', function (): void {
+    $directory = base_path('build/generated-enums-interactive');
+    $filePath = $directory.'/WeddingPermission.php';
+
+    File::deleteDirectory($directory);
+
+    $this->artisan('access-control:make-enum', [
+        '--path' => $directory,
+    ])
+        ->expectsQuestion('What should the enum be called?', 'WeddingPermission')
+        ->expectsQuestion('What model or resource should these permissions use?', 'wedding')
+        ->expectsConfirmation('Include deny permissions too?', 'yes')
+        ->assertSuccessful();
+
+    $contents = File::get($filePath);
+
+    expect($contents)->toContain("enum WeddingPermission: string")
+        ->and($contents)->toContain("case ALLOW_VIEW = 'wedding:view';")
+        ->and($contents)->toContain("case DENY_VIEW = 'wedding:view:deny';");
+});
+
 it('can include deny cases when generating a permissions enum', function (): void {
     $directory = base_path('build/generated-enums-with-deny');
     $filePath = $directory.'/CustomerPermission.php';
