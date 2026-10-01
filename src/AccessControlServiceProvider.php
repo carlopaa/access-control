@@ -13,9 +13,8 @@ use Aapolrac\AccessControl\Contracts\ScopeResolver;
 use Aapolrac\AccessControl\Contracts\TenantResolver;
 use Aapolrac\AccessControl\Middleware\CheckPermission;
 use Aapolrac\AccessControl\Middleware\CheckRole;
-use Aapolrac\AccessControl\Support\DefaultOrganizationResolver;
 use Aapolrac\AccessControl\Support\DefaultScopeResolver;
-use Aapolrac\AccessControl\Support\DefaultTenantResolver;
+use Aapolrac\AccessControl\Support\GateAbilityResolver;
 use Aapolrac\AccessControl\Support\GateRegistrar;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Gate;
@@ -35,6 +34,7 @@ class AccessControlServiceProvider extends PackageServiceProvider
             ->hasMigration('create_group_permission_table')
             ->hasMigration('create_role_user_table')
             ->hasMigration('create_group_user_table')
+            ->hasMigration('make_role_user_scope_nullable')
             ->hasCommand(AccessControlCommand::class)
             ->hasCommand(InstallAccessControlCommand::class)
             ->hasCommand(MakePermissionsEnumCommand::class)
@@ -63,18 +63,15 @@ class AccessControlServiceProvider extends PackageServiceProvider
 
     protected function registerGates(): void
     {
-        // Register a catch-all Gate::before so any $user->can('some:permission') is
-        // resolved through hasPermission() on models using the HasAccessControl trait.
-        Gate::before(static function ($user, string $ability): ?bool {
-            if (! method_exists($user, 'hasPermission')) {
-                return null;
-            }
+        // Catch-all Gate::before hook. Abilities are resolved through hasPermission() on
+        // models using HasAccessControl. The hook receives the ability arguments and
+        // abstains whenever a policy or a defined ability can handle them, so
+        // `$user->can('posts.update', $post)` reaches the policy with $post intact.
+        Gate::before(static function ($user, string $ability, array $arguments = []): ?bool {
+            /** @var GateAbilityResolver $resolver */
+            $resolver = app(GateAbilityResolver::class);
 
-            if ($user->hasPermission($ability)) {
-                return true;
-            }
-
-            return null;
+            return $resolver($user, $ability, $arguments);
         });
 
         $enumClasses = (array) config('access_control.permissions.enum_classes', []);

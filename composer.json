@@ -1,6 +1,6 @@
 {
     "name": "carlopaa/access-control",
-    "description": "Tenant-aware access control with roles, groups, and permissions",
+    "description": "Scope-aware access control for Laravel with roles, groups, and permissions",
     "keywords": [
         "carlopaa",
         "laravel",

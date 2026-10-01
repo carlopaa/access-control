@@ -9,7 +9,7 @@ use Aapolrac\AccessControl\Contracts\ScopeResolver;
 use Aapolrac\AccessControl\Contracts\TenantResolver;
 use Illuminate\Database\Eloquent\Model;
 
-class DefaultScopeResolver implements ScopeResolver, OrganizationResolver, TenantResolver
+class DefaultScopeResolver implements OrganizationResolver, ScopeResolver, TenantResolver
 {
     public function resolveScopeId(?Model $scope = null): ?int
     {

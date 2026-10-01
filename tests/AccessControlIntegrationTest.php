@@ -21,8 +21,8 @@ use Aapolrac\AccessControl\Tests\Fixtures\User;
 use Aapolrac\AccessControl\Tests\Fixtures\Wedding;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 
 it('provides default trait relationships and resolves permissions with deny overrides', function (): void {
     $user = User::create();
@@ -34,7 +34,13 @@ it('provides default trait relationships and resolves permissions with deny over
 
     expect($user->groups()->getRelated()::class)->toBe(Group::class)
         ->and($user->roles()->getRelated()::class)->toBe(Role::class)
-        ->and($user->hasPermission('member:view-any'))->toBeTrue();
+        // A grant in scope 1 is only visible when scope 1 is evaluated.
+        ->and($user->hasPermission('member:view-any', 1))->toBeTrue()
+        ->and($user->hasPermission('member:view-any'))->toBeFalse();
+
+    app()->bind(ScopeResolver::class, static fn () => new TestScopeResolver(1));
+
+    expect($user->hasPermission('member:view-any'))->toBeTrue();
 
     $user->assignPermission('member:update');
 
@@ -58,7 +64,10 @@ it('checks roles and organization-aware scopes', function (): void {
 
     app()->bind(OrganizationResolver::class, static fn () => new TestOrganizationResolver(20));
 
-    expect($firstUser->hasRole('owner'))->toBeTrue()
+    expect($firstUser->hasRole('owner'))->toBeFalse() // active scope is 20
+        ->and($firstUser->hasRole('owner', 10))->toBeTrue()
+        ->and($firstUser->hasRoleInAnyScope('owner'))->toBeTrue()
+        ->and($secondUser->hasRole('manager'))->toBeTrue() // active scope is 20
         ->and($firstUser->hasRoleInScope('owner', 10))->toBeTrue()
         ->and($firstUser->hasRoleInOrg('owner', 10))->toBeTrue()
         ->and($firstUser->hasRoleInOrg('owner', 20))->toBeFalse()
@@ -106,7 +115,7 @@ it('provides organization-scoped role and group assignment helpers', function ()
     expect($user->hasAnyRoleInOrg(['owner', 'manager'], 12))->toBeTrue()
         ->and($user->hasAnyRoleInScope(['owner', 'manager'], 12))->toBeTrue()
         ->and($user->groups()->wherePivot('organization_id', 12)->pluck('key')->all())
-            ->toEqualCanonicalizing([$owners->key, $reviewers->key]);
+        ->toEqualCanonicalizing([$owners->key, $reviewers->key]);
 
     $user->syncRoles(['manager'], 12)
         ->syncGroups(['reviewers'], 12);
@@ -114,7 +123,7 @@ it('provides organization-scoped role and group assignment helpers', function ()
     expect($user->fresh()->hasRoleInOrg('owner', 12))->toBeFalse()
         ->and($user->fresh()->hasRoleInOrg('manager', 12))->toBeTrue()
         ->and($user->fresh()->groups()->wherePivot('organization_id', 12)->pluck('key')->all())
-            ->toEqualCanonicalizing([$reviewers->key]);
+        ->toEqualCanonicalizing([$reviewers->key]);
 
     $user->revokeRole('manager', 12)
         ->revokeGroup('reviewers', 12);
@@ -148,10 +157,12 @@ it('syncs permissions from configured enums and integrates with gates', function
     $group->permissions()->attach($permission);
     $user->groups()->attach($group->getKey(), ['organization_id' => 1]);
 
+    app()->bind(ScopeResolver::class, static fn () => new TestScopeResolver(1));
+
     expect($user->can(MemberPermission::ViewAny->value))->toBeTrue()
         ->and($user->can(MemberPermission::Update->value))->toBeFalse()
         ->and(Permission::query()->pluck('name')->all())
-            ->toEqualCanonicalizing([MemberPermission::ViewAny->value, MemberPermission::Update->value]);
+        ->toEqualCanonicalizing([MemberPermission::ViewAny->value, MemberPermission::Update->value]);
 });
 
 it('installs config and migrations with a configurable scope setup', function (): void {
@@ -249,7 +260,7 @@ it('generates a permissions enum for a resource', function (): void {
 
     $contents = File::get($filePath);
 
-    expect($contents)->toContain("enum CustomerPermission: string")
+    expect($contents)->toContain('enum CustomerPermission: string')
         ->and($contents)->toContain("case ALLOW_VIEW = 'customer:view';")
         ->and($contents)->toContain("case ALLOW_DELETE_ANY = 'customer:delete-any';")
         ->and($contents)->not->toContain('DENY_VIEW');
@@ -297,7 +308,7 @@ PHP);
 
     $contents = File::get($filePath);
 
-    expect($contents)->toContain("enum WeddingPermission: string")
+    expect($contents)->toContain('enum WeddingPermission: string')
         ->and($contents)->not->toContain('declare(strict_types=1);')
         ->and($contents)->toContain("case ALLOW_VIEW = 'guest:view';")
         ->and($contents)->toContain("case DENY_VIEW = 'guest:view:deny';");
@@ -357,6 +368,8 @@ it('registers middleware aliases that enforce package permissions and roles', fu
     $group->permissions()->attach($permission);
     $user->groups()->attach($group->getKey(), ['organization_id' => 1]);
     $user->roles()->attach($owner->getKey(), ['organization_id' => 1]);
+
+    app()->bind(ScopeResolver::class, static fn () => new TestScopeResolver(1));
 
     Route::middleware('access.permission:member:view-any')->get('/permission-allowed', fn () => 'ok');
     Route::middleware('access.permission:member:update')->get('/permission-denied', fn () => 'ok');
@@ -453,7 +466,8 @@ it('honors custom model and table overrides across relationships and sync helper
         ->and(config('access_control.scope.model'))->toBe(Wedding::class)
         ->and(config('access_control.scope.foreign_key'))->toBe('wedding_id')
         ->and($user->hasRoleInScope('owner', (int) $wedding->getKey()))->toBeTrue()
-        ->and($user->hasPermission('reports:view'))->toBeTrue()
+        ->and($user->hasPermission('reports:view', $wedding))->toBeTrue()
+        ->and($user->hasPermission('reports:view'))->toBeFalse()
         ->and(User::query()->withRoleInScope('owner', $wedding)->pluck('id')->all())->toBe([$user->id]);
 
     RoleGroupSync::syncDefaultsForRoles($user, $wedding, ['owner']);

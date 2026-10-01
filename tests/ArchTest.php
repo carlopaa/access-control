@@ -39,3 +39,13 @@ arch('commands use strict types')
 arch('middleware use strict types')
     ->expect('Aapolrac\AccessControl\Middleware')
     ->toUseStrictTypes();
+
+arch('core package does not depend on optional UI frameworks or HTTP request state')
+    ->expect('Aapolrac\AccessControl')
+    ->not->toUse([
+        'Filament',
+        'Livewire',
+        'Illuminate\Http\Request',
+        'Illuminate\Support\Facades\Request',
+    ])
+    ->ignoring('Aapolrac\AccessControl\Middleware');

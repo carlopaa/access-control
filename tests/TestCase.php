@@ -3,8 +3,8 @@
 namespace Aapolrac\AccessControl\Tests;
 
 use Aapolrac\AccessControl\AccessControlServiceProvider;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
 
