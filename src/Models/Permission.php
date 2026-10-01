@@ -9,18 +9,23 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Permission extends Model
 {
-    protected $table = 'permissions';
-
     protected $fillable = [
         'name',
         'description',
     ];
 
+    public function getTable(): string
+    {
+        return (string) config('access_control.tables.permissions', 'permissions');
+    }
+
     public function groups(): BelongsToMany
     {
         return $this->belongsToMany(
-            Group::class,
-            config('access_control.tables.group_permission', 'group_permission')
+            (string) config('access_control.models.group'),
+            config('access_control.tables.group_permission', 'group_permission'),
+            'permission_id',
+            'group_id'
         )->withTimestamps();
     }
 }
